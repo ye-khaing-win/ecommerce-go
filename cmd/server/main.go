@@ -3,12 +3,18 @@ package main
 import (
 	"ecommerce-go/internal/api/router"
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
-	port := 3000
+	if err := godotenv.Load(); err != nil {
+		panic(err.Error())
+	}
+	port := os.Getenv("HTTP_PORT")
+	fmt.Println(port)
 
 	mux := router.Router()
 
