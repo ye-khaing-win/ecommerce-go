@@ -1,20 +1,19 @@
 package handlers
 
 import (
-	"database/sql"
 	"ecommerce-go/internal/models"
 	"ecommerce-go/internal/repositories"
 	"ecommerce-go/internal/validator"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
 func ListCategories(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL.Path)
 	cats, err := repositories.ListCategories()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -47,7 +46,7 @@ func GetCategory(w http.ResponseWriter, r *http.Request) {
 
 	cat, err := repositories.GetCategory(id)
 	switch {
-	case errors.Is(err, sql.ErrNoRows):
+	case errors.Is(err, repositories.ErrCategoryNotFound):
 		writeError(w, http.StatusNotFound, "Category not found")
 		return
 	case err != nil:
@@ -72,8 +71,7 @@ func GetCategory(w http.ResponseWriter, r *http.Request) {
 }
 func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var cat models.Category
-	err := json.NewDecoder(r.Body).Decode(&cat)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&cat); err != nil {
 		var ute *json.UnmarshalTypeError
 		if errors.As(err, &ute) {
 			msg := fmt.Sprintf("%s must be %s", strings.ToLower(ute.Field), ute.Type.Kind())
@@ -89,7 +87,7 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cat, err = repositories.CreateCategory(cat)
+	cat, err := repositories.CreateCategory(cat)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -112,14 +110,69 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 
 }
 func UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	if _, err := w.Write([]byte("Update Category")); err != nil {
-		log.Println("Write error: ", err)
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid ID")
+		return
 	}
+
+	var cat models.Category
+	if err := json.NewDecoder(r.Body).Decode(&cat); err != nil {
+		var ute *json.UnmarshalTypeError
+		if errors.As(err, &ute) {
+			msg := fmt.Sprintf("%s must be %s", strings.ToLower(ute.Field), ute.Type.Kind())
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	cat, err = repositories.UpdateCategory(id, cat)
+	if err != nil {
+		if errors.Is(err, repositories.ErrCategoryNotFound) {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	res := struct {
+		Status string          `json:"status,omitempty"`
+		Data   models.Category `json:"data,omitempty"`
+	}{
+		Status: "success",
+		Data:   cat,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err = json.NewEncoder(w).Encode(res); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 }
 func DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	if _, err := w.Write([]byte("Delete Category")); err != nil {
-		log.Println("Write error: ", err)
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid ID")
+		return
 	}
+
+	if err := repositories.DeleteCategory(id); err != nil {
+		if errors.Is(err, repositories.ErrCategoryNotFound) {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

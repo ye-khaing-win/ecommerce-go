@@ -14,7 +14,6 @@ func main() {
 		panic(err.Error())
 	}
 	port := os.Getenv("HTTP_PORT")
-	fmt.Println(port)
 
 	mux := router.Router()
 
