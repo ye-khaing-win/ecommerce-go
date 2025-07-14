@@ -1,9 +1,10 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
+	"ecommerce-go/internal/api/middlewares"
 	"ecommerce-go/internal/models"
-	"ecommerce-go/internal/repositories/sqlconnect"
 	"errors"
 	"fmt"
 	"reflect"
@@ -12,29 +13,65 @@ import (
 
 var ErrCategoryNotFound = errors.New("category not found")
 
-type CategoryRepository struct {
-	DB *sql.DB
+type categoryRepository struct {
+	db *sql.DB
 }
 
-func ListCategories() ([]models.Category, error) {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		return nil, err
+func NewCategoryRepository(db *sql.DB) Repository[models.Category] {
+	return &categoryRepository{db: db}
+}
+
+func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error) {
+	selected := middlewares.Selected(ctx)
+
+	selectedSet := make(map[string]struct{}, len(selected))
+	for _, f := range selected {
+		selectedSet[f] = struct{}{}
 	}
-	defer db.Close()
 
-	query := "SELECT id, name, description FROM categories"
+	dbFields := GetDBFields(models.Category{}, selectedSet)
 
-	rows, err := db.Query(query)
+	//var cols []string
+	//
+	//t := reflect.TypeOf(models.Category{})
+	//for i := 0; i < t.NumField(); i++ {
+	//	f := t.Field(i).Tag.Get("db")
+	//	if slices.Contains(selected, f) {
+	//		cols = append(cols, f)
+	//	}
+	//}
+
+	query := fmt.Sprintf("SELECT %s FROM categories", strings.Join(dbFields, ", "))
+
+	rows, err := r.db.QueryContext(ctx, query)
+
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var cats []models.Category
+
 	for rows.Next() {
 		var cat models.Category
-		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Description); err != nil {
+
+		v := reflect.ValueOf(&cat).Elem()
+		t := v.Type()
+
+		var scanArgs []any
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i).Tag.Get("db")
+
+			//if slices.Contains(selected, field) {
+			//	ptr := v.Field(i).Addr().Interface()
+			//	scanArgs = append(scanArgs, ptr)
+			//}
+			if _, ok := selectedSet[field]; ok {
+				scanArgs = append(scanArgs, v.Field(i).Addr().Interface())
+			}
+		}
+
+		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, err
 		}
 		cats = append(cats, cat)
@@ -42,17 +79,12 @@ func ListCategories() ([]models.Category, error) {
 
 	return cats, nil
 }
-func GetCategory(id int) (models.Category, error) {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		return models.Category{}, err
-	}
-	defer db.Close()
+func (r *categoryRepository) Get(id int) (models.Category, error) {
 
 	var cat models.Category
 	query := "SELECT id, name, description FROM categories WHERE id = ?"
 
-	if err := db.QueryRow(query, id).Scan(&cat.ID, &cat.Name, &cat.Description); err != nil {
+	if err := r.db.QueryRow(query, id).Scan(&cat.ID, &cat.Name, &cat.Description); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Category{}, ErrCategoryNotFound
 		}
@@ -62,14 +94,9 @@ func GetCategory(id int) (models.Category, error) {
 	return cat, nil
 
 }
-func CreateCategory(cat models.Category) (models.Category, error) {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		return models.Category{}, err
-	}
-	defer db.Close()
+func (r *categoryRepository) Create(cat models.Category) (models.Category, error) {
 
-	res, err := db.Exec("INSERT INTO categories (name, description) VALUES (?, ?)", cat.Name, cat.Description)
+	res, err := r.db.Exec("INSERT INTO categories (name, description) VALUES (?, ?)", cat.Name, cat.Description)
 	if err != nil {
 		return models.Category{}, err
 	}
@@ -83,12 +110,8 @@ func CreateCategory(cat models.Category) (models.Category, error) {
 	return cat, nil
 
 }
-func UpdateCategory(id int, cat models.Category) (models.Category, error) {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		return models.Category{}, err
-	}
-	defer db.Close()
+
+func (r *categoryRepository) Update(id int, cat models.Category) (models.Category, error) {
 
 	var sets []string
 	var args []any
@@ -111,7 +134,7 @@ func UpdateCategory(id int, cat models.Category) (models.Category, error) {
 	query := fmt.Sprintf("UPDATE categories SET %s WHERE id = ?", strings.Join(sets, ", "))
 	args = append(args, id)
 
-	res, err := db.Exec(query, args...)
+	res, err := r.db.Exec(query, args...)
 	if err != nil {
 		return models.Category{}, err
 	}
@@ -121,7 +144,10 @@ func UpdateCategory(id int, cat models.Category) (models.Category, error) {
 		return models.Category{}, err
 	}
 
-	row := db.QueryRow(fmt.Sprintf("SELECT %s FROM categories WHERE id = ?", strings.Join(cols, ", ")), id)
+	row := r.db.QueryRow(fmt.Sprintf(
+		"SELECT %s FROM categories WHERE id = ?",
+		strings.Join(cols, ", "),
+	), id)
 	if err = row.Scan(&cat.ID, &cat.Name, &cat.Description); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Category{}, ErrCategoryNotFound
@@ -134,14 +160,9 @@ func UpdateCategory(id int, cat models.Category) (models.Category, error) {
 	return cat, nil
 
 }
-func DeleteCategory(id int) error {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+func (r *categoryRepository) Delete(id int) error {
 
-	res, err := db.Exec("DELETE FROM categories WHERE id = ?", id)
+	res, err := r.db.Exec("DELETE FROM categories WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -156,4 +177,21 @@ func DeleteCategory(id int) error {
 
 	return nil
 
+}
+
+func GetDBFields(model any, whitelist map[string]struct{}) []string {
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	var fields []string
+	for i := 0; i < t.NumField(); i++ {
+		dbTag := t.Field(i).Tag.Get("db")
+		if _, ok := whitelist[dbTag]; ok {
+			fields = append(fields, dbTag)
+		}
+	}
+
+	return fields
 }

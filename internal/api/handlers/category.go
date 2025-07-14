@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"ecommerce-go/internal/app"
 	"ecommerce-go/internal/models"
 	"ecommerce-go/internal/repositories"
 	"ecommerce-go/internal/validator"
@@ -12,9 +13,19 @@ import (
 	"strings"
 )
 
-func ListCategories(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL.Path)
-	cats, err := repositories.ListCategories()
+type CategoryHandler struct {
+	app *app.Application
+}
+
+func NewCategoryHandler(app *app.Application) *CategoryHandler {
+	return &CategoryHandler{app: app}
+}
+
+func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
+
+	repo := repositories.NewCategoryRepository(h.app.Db)
+	cats, err := repo.List(r.Context())
+
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -36,15 +47,15 @@ func ListCategories(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func GetCategory(w http.ResponseWriter, r *http.Request) {
+func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
-
-	cat, err := repositories.GetCategory(id)
+	repo := repositories.NewCategoryRepository(h.app.Db)
+	cat, err := repo.Get(id)
 	switch {
 	case errors.Is(err, repositories.ErrCategoryNotFound):
 		writeError(w, http.StatusNotFound, "Category not found")
@@ -69,7 +80,7 @@ func GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func CreateCategory(w http.ResponseWriter, r *http.Request) {
+func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var cat models.Category
 	if err := json.NewDecoder(r.Body).Decode(&cat); err != nil {
 		var ute *json.UnmarshalTypeError
@@ -87,7 +98,8 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cat, err := repositories.CreateCategory(cat)
+	repo := repositories.NewCategoryRepository(h.app.Db)
+	cat, err := repo.Create(cat)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -109,7 +121,7 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func UpdateCategory(w http.ResponseWriter, r *http.Request) {
+func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -129,7 +141,8 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cat, err = repositories.UpdateCategory(id, cat)
+	repo := repositories.NewCategoryRepository(h.app.Db)
+	cat, err = repo.Update(id, cat)
 	if err != nil {
 		if errors.Is(err, repositories.ErrCategoryNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
@@ -154,7 +167,7 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func DeleteCategory(w http.ResponseWriter, r *http.Request) {
+func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -162,7 +175,8 @@ func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := repositories.DeleteCategory(id); err != nil {
+	repo := repositories.NewCategoryRepository(h.app.Db)
+	if err := repo.Delete(id); err != nil {
 		if errors.Is(err, repositories.ErrCategoryNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
