@@ -23,27 +23,36 @@ func NewCategoryRepository(db *sql.DB) Repository[models.Category] {
 
 func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error) {
 	selected := middlewares.Selected(ctx)
+	filtered := middlewares.Filtered(ctx)
+	sorted := middlewares.Sorted(ctx)
+	fmt.Println("Filtered: ", filtered)
+	fmt.Println("Selected: ", selected)
+	fmt.Println("Sorted: ", sorted)
 
-	selectedSet := make(map[string]struct{}, len(selected))
-	for _, f := range selected {
-		selectedSet[f] = struct{}{}
+	dbFields := GetDBFields(models.Category{}, selected)
+
+	query := fmt.Sprintf("SELECT %s FROM categories WHERE 1 = 1", strings.Join(dbFields, ", "))
+
+	// FILTERING
+	var args []any
+	for k, v := range filtered {
+		query += fmt.Sprintf(" AND %s = ?", k)
+		args = append(args, v)
 	}
 
-	dbFields := GetDBFields(models.Category{}, selectedSet)
+	if len(sorted) > 0 {
 
-	//var cols []string
-	//
-	//t := reflect.TypeOf(models.Category{})
-	//for i := 0; i < t.NumField(); i++ {
-	//	f := t.Field(i).Tag.Get("db")
-	//	if slices.Contains(selected, f) {
-	//		cols = append(cols, f)
-	//	}
-	//}
+		var s []string
+		for field, order := range sorted {
+			s = append(s, fmt.Sprintf("%s %s", field, order))
+		}
+		fmt.Println("s: ", strings.Join(s, ","))
+		query += " ORDER BY " + strings.Join(s, ",")
+	}
 
-	query := fmt.Sprintf("SELECT %s FROM categories", strings.Join(dbFields, ", "))
+	fmt.Println("Query: ", query)
 
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 
 	if err != nil {
 		return nil, err
@@ -62,11 +71,7 @@ func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i).Tag.Get("db")
 
-			//if slices.Contains(selected, field) {
-			//	ptr := v.Field(i).Addr().Interface()
-			//	scanArgs = append(scanArgs, ptr)
-			//}
-			if _, ok := selectedSet[field]; ok {
+			if _, ok := selected[field]; ok {
 				scanArgs = append(scanArgs, v.Field(i).Addr().Interface())
 			}
 		}
@@ -75,6 +80,10 @@ func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error
 			return nil, err
 		}
 		cats = append(cats, cat)
+	}
+
+	if cats == nil {
+		cats = []models.Category{}
 	}
 
 	return cats, nil

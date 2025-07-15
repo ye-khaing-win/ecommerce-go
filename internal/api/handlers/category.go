@@ -34,7 +34,7 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 	res := struct {
 		Status string            `json:"status,omitempty"`
 		Count  int               `json:"count,omitempty"`
-		Data   []models.Category `json:"data,omitempty"`
+		Data   []models.Category `json:"data"`
 	}{
 		Status: "success",
 		Count:  len(cats),

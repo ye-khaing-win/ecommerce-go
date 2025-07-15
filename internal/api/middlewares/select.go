@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-type ctxKey string
-
-const key ctxKey = "selectFields"
+type selectKey struct {
+}
 
 var whitelist = map[string]struct{}{
 	"id":          {},
@@ -19,27 +18,30 @@ var whitelist = map[string]struct{}{
 func Select(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw := r.URL.Query().Get("select") // e.g. ?select=id,name
-		var fields []string
+		fields := make(map[string]struct{})
 		if raw != "" {
 
 			for _, f := range strings.Split(raw, ",") {
+				f = strings.TrimSpace(f)
 				if _, ok := whitelist[f]; ok {
-					fields = append(fields, f)
+					fields[f] = struct{}{}
 				}
 			}
 		} else {
 			for k := range whitelist {
-				fields = append(fields, k)
+				fields[k] = struct{}{}
 			}
 		}
 
-		ctx := context.WithValue(r.Context(), key, fields)
+		ctx := context.WithValue(r.Context(), selectKey{}, fields)
 
 		next.ServeHTTP(w, r.WithContext(ctx)) // propagate new ctx
 	})
 }
 
-func Selected(ctx context.Context) []string {
-	v, _ := ctx.Value(key).([]string)
-	return v
+func Selected(ctx context.Context) map[string]struct{} {
+	if m, ok := ctx.Value(selectKey{}).(map[string]struct{}); ok {
+		return m
+	}
+	return nil
 }
