@@ -24,7 +24,8 @@ func Sort(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("sort_by")
 		entries := strings.Split(q, ",")
-		sorted := make(map[string]SortDir)
+		//sorted := make(map[string]SortDir)
+		var sorted []string
 
 		if len(entries) > 0 {
 			for _, entry := range entries {
@@ -40,7 +41,7 @@ func Sort(next http.Handler) http.Handler {
 					continue
 				}
 
-				sorted[name] = order
+				sorted = append(sorted, fmt.Sprintf("%s %s", name, order))
 			}
 
 		}
@@ -57,7 +58,7 @@ func isWhiteListed(key string) bool {
 	return ok
 }
 
-func Sorted(ctx context.Context) map[string]SortDir {
-	v, _ := ctx.Value(sortKey{}).(map[string]SortDir)
+func Sorted(ctx context.Context) []string {
+	v, _ := ctx.Value(sortKey{}).([]string)
 	return v
 }

@@ -3,7 +3,7 @@ package handlers
 import (
 	"ecommerce-go/internal/app"
 	"ecommerce-go/internal/models"
-	"ecommerce-go/internal/repositories"
+	"ecommerce-go/internal/repos"
 	"ecommerce-go/internal/validator"
 	"encoding/json"
 	"errors"
@@ -23,7 +23,7 @@ func NewCategoryHandler(app *app.Application) *CategoryHandler {
 
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 
-	repo := repositories.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.app.Db)
 	cats, err := repo.List(r.Context())
 
 	if err != nil {
@@ -54,10 +54,10 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
-	repo := repositories.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.app.Db)
 	cat, err := repo.Get(id)
 	switch {
-	case errors.Is(err, repositories.ErrCategoryNotFound):
+	case errors.Is(err, repos.ErrCategoryNotFound):
 		writeError(w, http.StatusNotFound, "Category not found")
 		return
 	case err != nil:
@@ -98,7 +98,7 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repositories.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.app.Db)
 	cat, err := repo.Create(cat)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -141,10 +141,10 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repositories.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.app.Db)
 	cat, err = repo.Update(id, cat)
 	if err != nil {
-		if errors.Is(err, repositories.ErrCategoryNotFound) {
+		if errors.Is(err, repos.ErrCategoryNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
@@ -175,9 +175,9 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repositories.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.app.Db)
 	if err := repo.Delete(id); err != nil {
-		if errors.Is(err, repositories.ErrCategoryNotFound) {
+		if errors.Is(err, repos.ErrCategoryNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}

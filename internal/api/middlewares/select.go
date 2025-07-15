@@ -13,6 +13,7 @@ var whitelist = map[string]struct{}{
 	"id":          {},
 	"name":        {},
 	"description": {},
+	"created_at":  {},
 }
 
 func Select(next http.Handler) http.Handler {

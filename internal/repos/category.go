@@ -1,4 +1,4 @@
-package repositories
+package repos
 
 import (
 	"context"
@@ -40,14 +40,10 @@ func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error
 		args = append(args, v)
 	}
 
+	// SORTING
 	if len(sorted) > 0 {
 
-		var s []string
-		for field, order := range sorted {
-			s = append(s, fmt.Sprintf("%s %s", field, order))
-		}
-		fmt.Println("s: ", strings.Join(s, ","))
-		query += " ORDER BY " + strings.Join(s, ",")
+		query += " ORDER BY " + strings.Join(sorted, ",")
 	}
 
 	fmt.Println("Query: ", query)
@@ -75,7 +71,7 @@ func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error
 				scanArgs = append(scanArgs, v.Field(i).Addr().Interface())
 			}
 		}
-
+		fmt.Println(scanArgs)
 		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, err
 		}
