@@ -13,16 +13,28 @@ import (
 )
 
 type CategoryHandler struct {
-	app *app.Application
+	App            *app.Application
+	AllowedFilters map[string]struct{}
+	AllowedSorts   map[string]struct{}
 }
 
 func NewCategoryHandler(app *app.Application) *CategoryHandler {
-	return &CategoryHandler{app: app}
+
+	return &CategoryHandler{
+		App: app,
+		AllowedFilters: map[string]struct{}{
+			"name": {},
+		},
+		AllowedSorts: map[string]struct{}{
+			"name":       {},
+			"created_at": {},
+		},
+	}
 }
 
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 
-	repo := repos.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.App.Db)
 	cats, err := repo.List(r.Context())
 
 	if err != nil {
@@ -53,7 +65,7 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid ID")
 		return
 	}
-	repo := repos.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.App.Db)
 	cat, err := repo.Get(id)
 	switch {
 	case errors.Is(err, repos.ErrCategoryNotFound):
@@ -92,7 +104,7 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repos.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.App.Db)
 	cat, err := repo.Create(cat)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
@@ -129,7 +141,7 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repos.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.App.Db)
 	cat, err = repo.Update(id, cat)
 	if err != nil {
 		if errors.Is(err, repos.ErrCategoryNotFound) {
@@ -163,7 +175,7 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repo := repos.NewCategoryRepository(h.app.Db)
+	repo := repos.NewCategoryRepository(h.App.Db)
 	if err := repo.Delete(id); err != nil {
 		if errors.Is(err, repos.ErrCategoryNotFound) {
 			utils.WriteError(w, http.StatusNotFound, err.Error())

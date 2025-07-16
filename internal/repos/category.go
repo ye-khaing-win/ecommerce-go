@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"ecommerce-go/internal/api/middlewares"
 	"ecommerce-go/internal/models"
+	"ecommerce-go/pkg/utils"
 	"errors"
 	"fmt"
 	"reflect"
@@ -22,31 +23,23 @@ func NewCategoryRepository(db *sql.DB) CRUDRepo[models.Category] {
 }
 
 func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error) {
-	selected := middlewares.Selected(ctx)
-	filtered := middlewares.Filtered(ctx)
-	sorted := middlewares.Sorted(ctx)
-	fmt.Println("Filtered: ", filtered)
-	fmt.Println("Selected: ", selected)
-	fmt.Println("Sorted: ", sorted)
+	filters := middlewares.Filtered(ctx)
+	sorts := middlewares.Sorted(ctx)
+	fmt.Println("Filters: ", filters)
+	fmt.Println("Sorts: ", sorts)
 
-	dbFields := GetDBFields(models.Category{}, selected)
-
-	query := fmt.Sprintf("SELECT %s FROM categories WHERE 1 = 1", strings.Join(dbFields, ", "))
+	query := `
+			SELECT id, name, description, created_at
+			FROM categories 
+			WHERE 1 = 1
+			`
 
 	// FILTERING
-	var args []any
-	for k, v := range filtered {
-		query += fmt.Sprintf(" AND %s = ?", k)
-		args = append(args, v)
-	}
-
+	filterQuery, args := utils.ApplyFilters(filters)
+	query += filterQuery
 	// SORTING
-	if len(sorted) > 0 {
-
-		query += " ORDER BY " + strings.Join(sorted, ",")
-	}
-
-	fmt.Println("Query: ", query)
+	sortQuery := utils.ApplySorts(sorts)
+	query += sortQuery
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 
@@ -60,19 +53,7 @@ func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error
 	for rows.Next() {
 		var cat models.Category
 
-		v := reflect.ValueOf(&cat).Elem()
-		t := v.Type()
-
-		var scanArgs []any
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i).Tag.Get("db")
-
-			if _, ok := selected[field]; ok {
-				scanArgs = append(scanArgs, v.Field(i).Addr().Interface())
-			}
-		}
-		fmt.Println(scanArgs)
-		if err := rows.Scan(scanArgs...); err != nil {
+		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Description, &cat.CreatedAt); err != nil {
 			return nil, err
 		}
 		cats = append(cats, cat)

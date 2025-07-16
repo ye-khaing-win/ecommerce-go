@@ -13,25 +13,44 @@ import (
 )
 
 type ItemHandler struct {
-	app *app.Application
+	App            *app.Application
+	AllowedFilters map[string]struct{}
+	AllowedSorts   map[string]struct{}
 }
 
 func NewItemHandler(app *app.Application) *ItemHandler {
-	return &ItemHandler{app: app}
+	return &ItemHandler{
+		App: app,
+		AllowedFilters: map[string]struct{}{
+			"name":        {},
+			"description": {},
+			"category_id": {},
+		},
+		AllowedSorts: map[string]struct{}{
+			"name":       {},
+			"price":      {},
+			"created_at": {},
+		},
+	}
 }
 
 func (h *ItemHandler) ListItems(w http.ResponseWriter, r *http.Request) {
+	repo := repos.NewItemRepository(h.App.Db)
+	items, err := repo.List(r.Context())
+
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	res := struct {
-		Status string `json:"status,omitempty"`
-		//Count   int    `json:"count,omitempty"`
-		Message string `json:"message"`
-		//Data   []models.Category `json:"data"`
+		Status string        `json:"status,omitempty"`
+		Count  int           `json:"count,omitempty"`
+		Data   []models.Item `json:"data"`
 	}{
 		Status: "success",
-		//Count:  len(cats),
-		//Data:   cats,
-		Message: "Good job buddy",
+		Count:  len(items),
+		Data:   items,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(res); err != nil {
@@ -39,7 +58,6 @@ func (h *ItemHandler) ListItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
@@ -48,7 +66,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repo := repos.NewItemRepository(h.app.Db)
+	repo := repos.NewItemRepository(h.App.Db)
 	item, err := repo.Get(id)
 
 	switch {
@@ -74,7 +92,6 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 func (h *ItemHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 	var item models.Item
 
@@ -88,7 +105,7 @@ func (h *ItemHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repo := repos.NewItemRepository(h.app.Db)
+	repo := repos.NewItemRepository(h.App.Db)
 	item, err := repo.Create(item)
 
 	if err != nil {

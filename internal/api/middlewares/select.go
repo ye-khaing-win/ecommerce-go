@@ -9,35 +9,30 @@ import (
 type selectKey struct {
 }
 
-var whitelist = map[string]struct{}{
-	"id":          {},
-	"name":        {},
-	"description": {},
-	"created_at":  {},
-}
+func Select(whitelist map[string]struct{}) func(handler http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			raw := r.URL.Query().Get("select") // e.g. ?select=id,name
+			fields := make(map[string]struct{})
+			if raw != "" {
 
-func Select(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := r.URL.Query().Get("select") // e.g. ?select=id,name
-		fields := make(map[string]struct{})
-		if raw != "" {
-
-			for _, f := range strings.Split(raw, ",") {
-				f = strings.TrimSpace(f)
-				if _, ok := whitelist[f]; ok {
-					fields[f] = struct{}{}
+				for _, f := range strings.Split(raw, ",") {
+					f = strings.TrimSpace(f)
+					if _, ok := whitelist[f]; ok {
+						fields[f] = struct{}{}
+					}
+				}
+			} else {
+				for k := range whitelist {
+					fields[k] = struct{}{}
 				}
 			}
-		} else {
-			for k := range whitelist {
-				fields[k] = struct{}{}
-			}
-		}
 
-		ctx := context.WithValue(r.Context(), selectKey{}, fields)
+			ctx := context.WithValue(r.Context(), selectKey{}, fields)
 
-		next.ServeHTTP(w, r.WithContext(ctx)) // propagate new ctx
-	})
+			next.ServeHTTP(w, r.WithContext(ctx)) // propagate new ctx
+		})
+	}
 }
 
 func Selected(ctx context.Context) map[string]struct{} {
