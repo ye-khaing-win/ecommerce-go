@@ -17,7 +17,7 @@ type categoryRepository struct {
 	db *sql.DB
 }
 
-func NewCategoryRepository(db *sql.DB) Repository[models.Category] {
+func NewCategoryRepository(db *sql.DB) CRUDRepo[models.Category] {
 	return &categoryRepository{db: db}
 }
 

@@ -10,4 +10,6 @@ func RegisterItemRoutes(mux *http.ServeMux, app *app.Application) {
 	h := handlers.NewItemHandler(app)
 
 	mux.HandleFunc("GET /items", h.ListItems)
+	mux.HandleFunc("GET /items/{id}", h.Get)
+	mux.HandleFunc("POST /items", h.CreateItem)
 }
