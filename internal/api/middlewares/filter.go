@@ -27,7 +27,7 @@ func Filter(whitelist map[string]struct{}) func(handler http.Handler) http.Handl
 	}
 }
 
-func Filtered(ctx context.Context) map[string]string {
+func GetFilters(ctx context.Context) map[string]string {
 	v, _ := ctx.Value(filterKey{}).(map[string]string)
 	return v
 }

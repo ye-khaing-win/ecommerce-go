@@ -23,8 +23,8 @@ func NewCategoryRepository(db *sql.DB) CRUDRepo[models.Category] {
 }
 
 func (r *categoryRepository) List(ctx context.Context) ([]models.Category, error) {
-	filters := middlewares.Filtered(ctx)
-	sorts := middlewares.Sorted(ctx)
+	filters := middlewares.GetFilters(ctx)
+	sorts := middlewares.GetSorts(ctx)
 	fmt.Println("Filters: ", filters)
 	fmt.Println("Sorts: ", sorts)
 
@@ -99,23 +99,7 @@ func (r *categoryRepository) Create(cat models.Category) (models.Category, error
 
 func (r *categoryRepository) Update(id int, cat models.Category) (models.Category, error) {
 
-	var sets []string
-	var args []any
-	var cols []string
-
-	catVal := reflect.ValueOf(cat)
-	catType := catVal.Type()
-	for i := 0; i < catVal.NumField(); i++ {
-		set := catType.Field(i).Tag.Get("db")
-		arg := catVal.Field(i).Interface()
-
-		cols = append(cols, set)
-		if !reflect.ValueOf(arg).IsZero() {
-			sets = append(sets, set+" = ?")
-			args = append(args, arg)
-		}
-
-	}
+	sets, args := utils.ApplyUpdates(cat)
 
 	query := fmt.Sprintf("UPDATE categories SET %s WHERE id = ?", strings.Join(sets, ", "))
 	args = append(args, id)
@@ -130,18 +114,14 @@ func (r *categoryRepository) Update(id int, cat models.Category) (models.Categor
 		return models.Category{}, err
 	}
 
-	row := r.db.QueryRow(fmt.Sprintf(
-		"SELECT %s FROM categories WHERE id = ?",
-		strings.Join(cols, ", "),
-	), id)
-	if err = row.Scan(&cat.ID, &cat.Name, &cat.Description); err != nil {
+	row := r.db.QueryRow(
+		`SELECT id, name, description, created_at FROM categories WHERE id = ?`, id)
+	if err = row.Scan(&cat.ID, &cat.Name, &cat.Description, &cat.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Category{}, ErrCategoryNotFound
 		}
 		return models.Category{}, err
 	}
-
-	fmt.Println("Cols: ", cols)
 
 	return cat, nil
 

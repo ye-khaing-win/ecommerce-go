@@ -60,7 +60,7 @@ func isWhiteListed(key string, whitelist map[string]struct{}) bool {
 	return ok
 }
 
-func Sorted(ctx context.Context) []string {
+func GetSorts(ctx context.Context) []string {
 	v, _ := ctx.Value(sortKey{}).([]string)
 	return v
 }

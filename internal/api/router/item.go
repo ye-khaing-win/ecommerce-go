@@ -11,6 +11,8 @@ func RegisterItemRoutes(mux *http.ServeMux, app *app.Application) {
 	h := handlers.NewItemHandler(app)
 
 	mux.Handle("GET /items", mw.Filter(h.AllowedFilters)(mw.Sort(h.AllowedSorts)(http.HandlerFunc(h.ListItems))))
-	mux.HandleFunc("GET /items/{id}", h.Get)
+	mux.HandleFunc("GET /items/{id}", h.GetItems)
 	mux.HandleFunc("POST /items", h.CreateItem)
+	mux.HandleFunc("PATCH /items/{id}", h.UpdateItem)
+	mux.HandleFunc("DELETE /items/{id}", h.DeleteItem)
 }

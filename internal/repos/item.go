@@ -9,24 +9,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var ErrItemNotFound = errors.New("item not found")
 
-type itemRepository struct {
+type ItemRepository struct {
 	db *sql.DB
 }
 
-func NewItemRepository(db *sql.DB) CRUDRepo[models.Item] {
-	return &itemRepository{db: db}
+func NewItemRepository(db *sql.DB) *ItemRepository {
+	return &ItemRepository{db: db}
 }
 
-func (r *itemRepository) List(ctx context.Context) ([]models.Item, error) {
-	filters := mw.Filtered(ctx)
-	sorts := mw.Sorted(ctx)
-
-	fmt.Println("Filters: ", filters)
-	fmt.Println("Sorts: ", sorts)
+func (r *ItemRepository) List(ctx context.Context) ([]models.Item, error) {
+	filters := mw.GetFilters(ctx)
+	sorts := mw.GetSorts(ctx)
 
 	query := `
 			SELECT i.id, i.name, i.description, i.price, i.category_id,
@@ -79,8 +77,7 @@ func (r *itemRepository) List(ctx context.Context) ([]models.Item, error) {
 	return items, nil
 
 }
-
-func (r *itemRepository) Get(id int) (models.Item, error) {
+func (r *ItemRepository) Get(id int) (models.Item, error) {
 	var item models.Item
 	var catJSON []byte
 	query := `
@@ -111,8 +108,7 @@ func (r *itemRepository) Get(id int) (models.Item, error) {
 
 	return item, nil
 }
-
-func (r *itemRepository) Create(dto models.Item) (models.Item, error) {
+func (r *ItemRepository) Create(dto models.Item) (models.Item, error) {
 	res, err := r.db.Exec(`INSERT INTO items 
     (name, description, category_id, price) 
 	VALUES (?, ?, ?, ?)`, dto.Name, dto.Description, dto.CategoryID, dto.Price)
@@ -135,13 +131,87 @@ func (r *itemRepository) Create(dto models.Item) (models.Item, error) {
 	return item, nil
 
 }
+func (r *ItemRepository) Update(id int, item models.Item) (models.Item, error) {
+	sets, args := utils.ApplyUpdates(item)
+	query := fmt.Sprintf("UPDATE items SET %s WHERE id = ?", strings.Join(sets, ", "))
+	args = append(args, id)
 
-func (r *itemRepository) Update(id int, cat models.Item) (models.Item, error) {
-	//TODO implement me
-	panic("implement me")
+	res, err := r.db.Exec(query, args...)
+	if err != nil {
+		return models.Item{}, err
+	}
+
+	_, err = res.RowsAffected()
+	if err != nil {
+		return models.Item{}, err
+	}
+
+	row := r.db.QueryRow(`SELECT id, name, description, price FROM items WHERE id = ?`, id)
+	if err = row.Scan(&item.ID, &item.Name, &item.Description, &item.Price); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Item{}, ErrItemNotFound
+		}
+		return models.Item{}, err
+	}
+
+	return item, nil
 }
+func (r *ItemRepository) Delete(id int) error {
+	res, err := r.db.Exec("DELETE FROM items WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
 
-func (r *itemRepository) Delete(id int) error {
-	//TODO implement me
-	panic("implement me")
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrItemNotFound
+	}
+
+	return nil
+}
+func (r *ItemRepository) ListByCategory(ctx context.Context, catID int) ([]models.Item, error) {
+	filters := mw.GetFilters(ctx)
+	sorts := mw.GetSorts(ctx)
+
+	query := `
+			SELECT id, name, description, price, category_id
+			FROM items
+			WHERE category_id = ?
+			`
+	args := []any{catID}
+	filterQuery, filterArgs := utils.ApplyFilters(filters)
+	query += filterQuery
+	args = append(args, filterArgs...)
+
+	sortQuery := utils.ApplySorts(sorts)
+	query += sortQuery
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.Item
+	for rows.Next() {
+		var item models.Item
+
+		if err := rows.Scan(&item.ID, &item.Name,
+			&item.Description, &item.Price,
+			&item.CategoryID); err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if items == nil {
+		items = []models.Item{}
+	}
+
+	return items, nil
 }
