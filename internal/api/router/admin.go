@@ -10,6 +10,6 @@ import (
 func RegisterAdminRoutes(mux *http.ServeMux, app *app.Application) {
 	h := handlers.NewAdminHandler(app)
 
-	mux.Handle("GET /admins", mw.Filter(h.AllowedFilters)(mw.Sort(h.AllowedSorts)(http.HandlerFunc(h.ListAdmin))))
+	mux.Handle("GET /admins", mw.Auth(mw.Filter(h.AllowedFilters)(mw.Sort(h.AllowedSorts)(http.HandlerFunc(h.ListAdmin)))))
 	mux.HandleFunc("POST /admins", h.CreateAdmin)
 }

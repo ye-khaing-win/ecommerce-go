@@ -11,6 +11,7 @@ func Router(app *app.Application) *http.ServeMux {
 	RegisterCategoryRoutes(mux, app)
 	RegisterItemRoutes(mux, app)
 	RegisterAdminRoutes(mux, app)
+	RegisterAuthRoutes(mux, app)
 
 	return mux
 }

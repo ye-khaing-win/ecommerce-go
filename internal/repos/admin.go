@@ -108,3 +108,22 @@ func (r *AdminRepository) Create(dto models.Admin) (models.Admin, error) {
 
 	return admin, nil
 }
+func (r *AdminRepository) GetByEmail(email string) (models.Admin, error) {
+	var admin models.Admin
+
+	query := `
+			SELECT id, email, password, role, active
+			FROM admins
+			WHERE email = ?
+			`
+	row := r.db.QueryRow(query, email)
+	if err := row.Scan(&admin.ID, &admin.Email,
+		&admin.Password, &admin.Role, &admin.Active); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Admin{}, ErrAdminNotFound
+		}
+		return models.Admin{}, err
+	}
+
+	return admin, nil
+}
